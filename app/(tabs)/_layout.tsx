@@ -31,6 +31,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="streaks"
+        options={{
+          title: 'Streaks',
+          tabBarIcon: ({ color, size }) => <Ionicons name="flame-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
