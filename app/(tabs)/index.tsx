@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { db } from '../../db/client';
 import { categories, habitLogs, habits } from '../../db/schema';
 
@@ -17,6 +18,7 @@ type Habit = {
 
 export default function HabitsScreen() {
   const { user } = useAuth();
+  const { colors } = useTheme();
   const [habitList, setHabitList] = useState<Habit[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
@@ -24,6 +26,7 @@ export default function HabitsScreen() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [categoryList, setCategoryList] = useState<{ id: number; name: string; colour: string }[]>([]);
   const [search, setSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState<number | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -38,6 +41,7 @@ export default function HabitsScreen() {
         name: habits.name,
         description: habits.description,
         colour: categories.colour,
+        categoryId: habits.categoryId,
       })
       .from(habits)
       .leftJoin(categories, eq(habits.categoryId, categories.id))
@@ -53,6 +57,7 @@ export default function HabitsScreen() {
       name: h.name,
       description: h.description,
       colour: h.colour ?? '#2d6a4f',
+      categoryId: h.categoryId,
       completedToday: completedIds.has(h.id),
     })));
   };
@@ -99,42 +104,63 @@ export default function HabitsScreen() {
     ]);
   };
 
-  const filtered = habitList.filter(h => h.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = habitList
+    .filter(h => h.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(h => filterCategory ? (h as any).categoryId === filterCategory : true);
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>My Habits</Text>
+        <Text style={[styles.title, { color: colors.primary }]}>My Habits</Text>
         <TouchableOpacity onPress={() => setShowAdd(!showAdd)}>
-          <Ionicons name="add-circle" size={32} color="#2d6a4f" />
+          <Ionicons name="add-circle" size={32} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       <TextInput
-        style={styles.search}
+        style={[styles.search, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
         placeholder="Search habits..."
+        placeholderTextColor={colors.subtext}
         value={search}
         onChangeText={setSearch}
       />
 
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+        <TouchableOpacity
+          style={[styles.filterChip, { backgroundColor: !filterCategory ? colors.primary : colors.card }]}
+          onPress={() => setFilterCategory(null)}
+        >
+          <Text style={{ color: !filterCategory ? '#fff' : colors.text }}>All</Text>
+        </TouchableOpacity>
+        {categoryList.map(cat => (
+          <TouchableOpacity
+            key={cat.id}
+            style={[styles.filterChip, { backgroundColor: filterCategory === cat.id ? cat.colour : colors.card }]}
+            onPress={() => setFilterCategory(filterCategory === cat.id ? null : cat.id)}
+          >
+            <Text style={{ color: filterCategory === cat.id ? '#fff' : colors.text }}>{cat.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
       {showAdd && (
-        <View style={styles.addCard}>
-          <Text style={styles.addTitle}>New Habit</Text>
-          <TextInput style={styles.input} placeholder="Habit name" value={newName} onChangeText={setNewName} />
-          <TextInput style={styles.input} placeholder="Description (optional)" value={newDesc} onChangeText={setNewDesc} />
-          <Text style={styles.label}>Category</Text>
+        <View style={[styles.addCard, { backgroundColor: colors.card }]}>
+          <Text style={[styles.addTitle, { color: colors.text }]}>New Habit</Text>
+          <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text }]} placeholder="Habit name" placeholderTextColor={colors.subtext} value={newName} onChangeText={setNewName} />
+          <TextInput style={[styles.input, { borderColor: colors.border, color: colors.text }]} placeholder="Description (optional)" placeholderTextColor={colors.subtext} value={newDesc} onChangeText={setNewDesc} />
+          <Text style={[styles.label, { color: colors.subtext }]}>Category</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {categoryList.map(cat => (
               <TouchableOpacity
                 key={cat.id}
-                style={[styles.catChip, { backgroundColor: selectedCategory === cat.id ? cat.colour : '#eee' }]}
+                style={[styles.catChip, { backgroundColor: selectedCategory === cat.id ? cat.colour : colors.background }]}
                 onPress={() => setSelectedCategory(cat.id)}
               >
-                <Text style={{ color: selectedCategory === cat.id ? '#fff' : '#333' }}>{cat.name}</Text>
+                <Text style={{ color: selectedCategory === cat.id ? '#fff' : colors.text }}>{cat.name}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
-          <TouchableOpacity style={styles.saveBtn} onPress={addHabit}>
+          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={addHabit}>
             <Text style={styles.saveBtnText}>Save Habit</Text>
           </TouchableOpacity>
         </View>
@@ -142,25 +168,25 @@ export default function HabitsScreen() {
 
       {filtered.length === 0 && (
         <View style={styles.empty}>
-          <Text style={styles.emptyText}>No habits yet. Tap + to add one!</Text>
+          <Text style={[styles.emptyText, { color: colors.subtext }]}>No habits yet. Tap + to add one!</Text>
         </View>
       )}
 
       {filtered.map(habit => (
-        <View key={habit.id} style={styles.habitCard}>
+        <View key={habit.id} style={[styles.habitCard, { backgroundColor: colors.card }]}>
           <View style={[styles.colourBar, { backgroundColor: habit.colour }]} />
           <View style={styles.habitInfo}>
-            <Text style={styles.habitName}>{habit.name}</Text>
-            {habit.description ? <Text style={styles.habitDesc}>{habit.description}</Text> : null}
+            <Text style={[styles.habitName, { color: colors.text }]}>{habit.name}</Text>
+            {habit.description ? <Text style={[styles.habitDesc, { color: colors.subtext }]}>{habit.description}</Text> : null}
           </View>
           <TouchableOpacity onPress={() => deleteHabit(habit.id)}>
-            <Ionicons name="trash-outline" size={20} color="#ccc" />
+            <Ionicons name="trash-outline" size={20} color={colors.subtext} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => toggleHabit(habit.id, !habit.completedToday)} style={styles.checkBtn}>
             <Ionicons
               name={habit.completedToday ? 'checkmark-circle' : 'ellipse-outline'}
               size={32}
-              color={habit.completedToday ? '#2d6a4f' : '#ccc'}
+              color={habit.completedToday ? colors.primary : colors.subtext}
             />
           </TouchableOpacity>
         </View>
@@ -170,23 +196,24 @@ export default function HabitsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f4f8' },
+  container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#2d6a4f' },
-  search: { marginHorizontal: 16, marginBottom: 12, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#e0e0e0' },
-  addCard: { margin: 16, backgroundColor: '#fff', borderRadius: 16, padding: 16, elevation: 2 },
-  addTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 12 },
-  input: { borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 10, padding: 12, marginBottom: 10, fontSize: 15 },
-  label: { fontSize: 14, color: '#666', marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: 'bold' },
+  search: { marginHorizontal: 16, marginBottom: 12, borderRadius: 12, padding: 12, borderWidth: 1 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
+  addCard: { margin: 16, borderRadius: 16, padding: 16, elevation: 2 },
+  addTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
+  input: { borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 10, fontSize: 15 },
+  label: { fontSize: 14, marginBottom: 8 },
   catChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
-  saveBtn: { backgroundColor: '#2d6a4f', borderRadius: 10, padding: 14, alignItems: 'center', marginTop: 12 },
+  saveBtn: { borderRadius: 10, padding: 14, alignItems: 'center', marginTop: 12 },
   saveBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   empty: { alignItems: 'center', marginTop: 60 },
-  emptyText: { color: '#999', fontSize: 16 },
-  habitCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 10, borderRadius: 14, overflow: 'hidden', elevation: 2 },
+  emptyText: { fontSize: 16 },
+  habitCard: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 10, borderRadius: 14, overflow: 'hidden', elevation: 2 },
   colourBar: { width: 6, height: '100%' },
   habitInfo: { flex: 1, padding: 14 },
-  habitName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  habitDesc: { fontSize: 13, color: '#999', marginTop: 2 },
+  habitName: { fontSize: 16, fontWeight: 'bold' },
+  habitDesc: { fontSize: 13, marginTop: 2 },
   checkBtn: { padding: 12 },
 });
